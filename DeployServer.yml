@@ -1,0 +1,76 @@
+- name: Deploy Python HTTPS Server as Non-Root User
+  hosts: all
+  become: false
+  vars:
+    user_name: imrane  # Replace with the non-root user you want to use
+  tasks:
+    - name: Ensure Python3 is installed (requires root)
+      become: true
+      package:
+        name: python3
+        state: present
+
+    - name: Ensure pip for Python3 is installed (requires root)
+      become: true
+      package:
+        name: python3-pip
+        state: present
+
+    - name: Create directories for server files under non-root user
+      file:
+        path: "/home/{{ user_name }}/python_server"
+        state: directory
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0755'
+
+    - name: Copy the Python server script to the target machine
+      copy:
+        src: ./server.py
+        dest: "/home/{{ user_name }}/python_server/server.py"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0755'
+
+    - name: Copy SSL key file
+      copy:
+        src: ./key.pem
+        dest: "/home/{{ user_name }}/python_server/key.pem"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0600'
+
+    - name: Copy SSL certificate file
+      copy:
+        src: ./cert.pem
+        dest: "/home/{{ user_name }}/python_server/cert.pem"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0600'
+
+    - name: Start Python server using nohup as non-root user
+      shell: "nohup python3 /home/{{ user_name }}/python_server/server.py > /home/{{ user_name }}/python_server/server.log 2>&1 &"
+      args:
+        chdir: "/home/{{ user_name }}/python_server"
+      become: false
+
+    - name: Create cron job to start Python server on reboot
+      cron:
+        name: "Start Python HTTPS Server on reboot"
+        user: "{{ user_name }}"
+        special_time: reboot
+        job: "nohup python3 /home/{{ user_name }}/python_server/server.py > /home/{{ user_name }}/python_server/server.log 2>&1"
+
+    - name: Test if the server is running
+      uri:
+        url: https://localhost:8443/
+        validate_certs: no
+        return_content: yes
+      register: result
+      retries: 5
+      delay: 3
+      until: result.status == 200
+
+    - name: Display server status
+      debug:
+        var: result.content
