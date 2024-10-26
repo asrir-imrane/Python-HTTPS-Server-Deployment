@@ -1,76 +1,87 @@
-- name: Deploy Python HTTPS Server as Non-Root User
-  hosts: all
-  become: false
+- name: Deploy Python HTTPS Server as Non-Root User # Define the playbook name for clarity
+  hosts: all  # Target all hosts in the inventory file
+  become: false  # Default to non-root privileges for tasks unless specified
   vars:
-    user_name: imrane  # Replace with the non-root user you want to use
+    user_name: imrane  # Define the non-root user to run the server as
+
   tasks:
+    # Ensure Python3 is installed on the target machine (requires root access)
     - name: Ensure Python3 is installed (requires root)
-      become: true
+      become: true  # Run this task with root privileges
       package:
-        name: python3
-        state: present
+        name: python3  # Specify the package name as Python3
+        state: present  # Ensure Python3 is installed (present)
 
+    # Ensure pip for Python3 is installed on the target machine (requires root access)
     - name: Ensure pip for Python3 is installed (requires root)
-      become: true
+      become: true  # Run this task with root privileges
       package:
-        name: python3-pip
-        state: present
+        name: python3-pip  # Specify the package name for Python3 pip
+        state: present  # Ensure pip is installed (present)
 
+    # Create a directory for the server files under the specified non-root user
     - name: Create directories for server files under non-root user
       file:
-        path: "/home/{{ user_name }}/python_server"
-        state: directory
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
-        mode: '0755'
+        path: "/home/{{ user_name }}/python_server"  # Path to create for server files
+        state: directory  # Ensure a directory is created
+        owner: "{{ user_name }}"  # Set ownership to the non-root user
+        group: "{{ user_name }}"  # Set group ownership to the non-root user
+        mode: '0755'  # Set permissions to allow the owner full access, others read/execute
 
+    # Copy the Python server script to the specified directory on the target machine
     - name: Copy the Python server script to the target machine
       copy:
-        src: ./server.py
-        dest: "/home/{{ user_name }}/python_server/server.py"
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
-        mode: '0755'
+        src: ./server.py  # Local path to the server script
+        dest: "/home/{{ user_name }}/python_server/server.py"  # Destination path on target machine
+        owner: "{{ user_name }}"  # Set ownership to the non-root user
+        group: "{{ user_name }}"  # Set group ownership to the non-root user
+        mode: '0755'  # Set permissions to allow the owner full access, others read/execute
 
+    # Copy the SSL key file to the target machine under secure permissions
     - name: Copy SSL key file
       copy:
-        src: ./key.pem
-        dest: "/home/{{ user_name }}/python_server/key.pem"
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
-        mode: '0600'
+        src: ./key.pem  # Local path to the SSL key file
+        dest: "/home/{{ user_name }}/python_server/key.pem"  # Destination path on target machine
+        owner: "{{ user_name }}"  # Set ownership to the non-root user
+        group: "{{ user_name }}"  # Set group ownership to the non-root user
+        mode: '0600'  # Secure permissions (only owner can read/write)
 
+    # Copy the SSL certificate file to the target machine under secure permissions
     - name: Copy SSL certificate file
       copy:
-        src: ./cert.pem
-        dest: "/home/{{ user_name }}/python_server/cert.pem"
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
-        mode: '0600'
+        src: ./cert.pem  # Local path to the SSL certificate file
+        dest: "/home/{{ user_name }}/python_server/cert.pem"  # Destination path on target machine
+        owner: "{{ user_name }}"  # Set ownership to the non-root user
+        group: "{{ user_name }}"  # Set group ownership to the non-root user
+        mode: '0600'  # Secure permissions (only owner can read/write)
 
+    # Start the Python server using nohup to keep it running in the background
     - name: Start Python server using nohup as non-root user
-      shell: "nohup python3 /home/{{ user_name }}/python_server/server.py > /home/{{ user_name }}/python_server/server.log 2>&1 &"
+      shell: "nohup python3 /home/{{ user_name }}/python_server/server.py > /home/{{ user_name }}/python_server/server.log 2>&1 &"  # Command to start server in background
       args:
-        chdir: "/home/{{ user_name }}/python_server"
-      become: false
+        chdir: "/home/{{ user_name }}/python_server"  # Change to server directory before running
+      become: false  # Run as non-root user to keep permissions as the user
 
+    # Set up a cron job to automatically start the Python server on system reboot
     - name: Create cron job to start Python server on reboot
       cron:
-        name: "Start Python HTTPS Server on reboot"
-        user: "{{ user_name }}"
-        special_time: reboot
-        job: "nohup python3 /home/{{ user_name }}/python_server/server.py > /home/{{ user_name }}/python_server/server.log 2>&1"
+        name: "Start Python HTTPS Server on reboot"  # Description for cron job
+        user: "{{ user_name }}"  # Run the cron job as the non-root user
+        special_time: reboot  # Run this cron job at every system reboot
+        job: "nohup python3 /home/{{ user_name }}/python_server/server.py > /home/{{ user_name }}/python_server/server.log 2>&1"  # Command to start server on reboot
 
+    # Test if the Python HTTPS server is running by making a request to the server's URL
     - name: Test if the server is running
       uri:
-        url: https://localhost:8443/
-        validate_certs: no
-        return_content: yes
-      register: result
-      retries: 5
-      delay: 3
-      until: result.status == 200
+        url: https://localhost:8443/  # URL to test server (localhost on HTTPS port 8443)
+        validate_certs: no  # Ignore SSL certificate validation (for self-signed certificates)
+        return_content: yes  # Retrieve content of the response
+      register: result  # Register the response in a variable named 'result'
+      retries: 5  # Retry up to 5 times if server is not running yet
+      delay: 3  # Wait 3 seconds between retries
+      until: result.status == 200  # Stop retrying when HTTP status 200 is received
 
+    # Display the server response content in the console for confirmation
     - name: Display server status
       debug:
-        var: result.content
+        var: result.content  # Output the server response content for review
