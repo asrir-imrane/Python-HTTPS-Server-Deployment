@@ -1,4 +1,3 @@
-
 # Python HTTPS Server Deployment with Ansible
 
 ## Overview
@@ -132,14 +131,19 @@ The following Ansible playbook automates the deployment of the Python HTTPS serv
    - Created a Python script (`server.py`) for an HTTPS server responding to GET requests.
    - Generated SSL certificates (`key.pem` and `cert.pem`) using OpenSSL.
 
-2. **Ansible Playbook**:
+2. **Environment Setup**:
+   - I am working in a **Debian distribution** installed via **WSL (Windows Subsystem for Linux)**, accessed using **MobaXterm**.
+   - Due to the WSL environment, `systemd` is not available, which means that I couldn't use `systemd` to manage the server service.
+   - Instead, I configured Ansible to use `nohup` and a `cron` job to keep the server running in the background and restart it on reboot.
+
+3. **Ansible Playbook**:
    - Configured Ansible to:
      - Install Python and pip as needed.
      - Copy the `server.py` script and SSL files to the target machine, setting the correct permissions for a non-root user.
      - Start the Python server using `nohup` to keep it running in the background.
-     - Create a `cron` job that ensures the server starts on reboot.
+     - Create a `cron` job that ensures the server starts on reboot, as a substitute for `systemd` which is unavailable on WSL.
 
-3. **Verification**:
+4. **Verification**:
    - Used the `uri` module to test if the server is running and responding at `https://localhost:8443`.
 
 ## 4. Challenges Faced and Solutions
